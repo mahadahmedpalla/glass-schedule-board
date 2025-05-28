@@ -30,8 +30,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     ? materials 
     : materials.filter(m => m.subjectId === selectedSubjectFilter);
 
-  // Get dates that have materials
+  // Get dates that have materials (filtered)
   const datesWithMaterials = filteredMaterials.map(m => new Date(m.date));
+
+  // Get subject color for filtered dates
+  const getDateColor = (date: Date) => {
+    if (selectedSubjectFilter === 'all') {
+      return '#10B981'; // Green for all subjects
+    }
+    
+    const subject = subjects.find(s => s.id === selectedSubjectFilter);
+    return subject ? subject.color : '#10B981';
+  };
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
@@ -76,7 +86,10 @@ const Dashboard: React.FC<DashboardProps> = ({
               <Button
                 variant={selectedSubjectFilter === 'all' ? 'default' : 'outline'}
                 onClick={() => setSelectedSubjectFilter('all')}
-                className="bg-white/20 border-white/30 hover:bg-white/30"
+                className={selectedSubjectFilter === 'all' 
+                  ? "bg-black text-white hover:bg-gray-800" 
+                  : "bg-white/20 border-white/30 hover:bg-white/30"
+                }
               >
                 All Subjects
               </Button>
@@ -112,8 +125,12 @@ const Dashboard: React.FC<DashboardProps> = ({
               modifiers={{
                 hasMaterials: datesWithMaterials
               }}
-              modifiersClassNames={{
-                hasMaterials: "bg-green-500 text-white hover:bg-green-600 font-semibold"
+              modifiersStyles={{
+                hasMaterials: { 
+                  backgroundColor: getDateColor(selectedDate || new Date()), 
+                  color: 'white',
+                  fontWeight: 'bold'
+                }
               }}
             />
           </CardContent>
@@ -129,8 +146,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           </Card>
           <Card className="bg-white/20 border-white/30 backdrop-blur-sm">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-gray-800">{materials.length}</div>
-              <p className="text-sm text-gray-600">Total Materials</p>
+              <div className="text-2xl font-bold text-gray-800">{filteredMaterials.length}</div>
+              <p className="text-sm text-gray-600">Filtered Materials</p>
             </CardContent>
           </Card>
           <Card className="bg-white/20 border-white/30 backdrop-blur-sm">
