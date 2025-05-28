@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { trash, plus } from 'lucide-react';
+import { Trash, Plus } from 'lucide-react';
 import { Subject } from '@/types';
 
 interface SubjectManagerProps {
@@ -60,7 +61,7 @@ const SubjectManager: React.FC<SubjectManagerProps> = ({
                   size="sm"
                   className="text-red-600 hover:text-red-700 hover:bg-red-50"
                 >
-                  <trash className="w-4 h-4" />
+                  <Trash className="w-4 h-4" />
                 </Button>
               </CardContent>
             </Card>
@@ -77,7 +78,7 @@ const SubjectManager: React.FC<SubjectManagerProps> = ({
           onClick={() => setShowCreateForm(true)}
           className="w-full bg-green-500 hover:bg-green-600 text-white"
         >
-          <plus className="w-4 h-4 mr-2" />
+          <Plus className="w-4 h-4 mr-2" />
           Add Subject
         </Button>
       )}

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CalendarIcon, plus } from 'lucide-react';
+import { CalendarIcon, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Subject, Material } from '@/types';
@@ -118,7 +117,7 @@ const MaterialCreator: React.FC<MaterialCreatorProps> = ({
         className="w-full bg-green-500 hover:bg-green-600 text-white"
         disabled={!selectedDate}
       >
-        <plus className="w-4 h-4 mr-2" />
+        <Plus className="w-4 h-4 mr-2" />
         Add Material
       </Button>
 
