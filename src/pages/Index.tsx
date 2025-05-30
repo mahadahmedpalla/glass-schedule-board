@@ -4,7 +4,7 @@ import Dashboard from '@/components/Dashboard';
 import SettingsPanel from '@/components/SettingsPanel';
 import MaterialsView from '@/components/MaterialsView';
 import PasscodeModal from '@/components/PasscodeModal';
-import { Material } from '@/types';
+import { Material, Subject } from '@/types';
 import { useSubjects } from '@/hooks/useSubjects';
 import { useMaterials } from '@/hooks/useMaterials';
 
@@ -29,7 +29,7 @@ const Index = () => {
     setViewMode('settings');
   };
 
-  const handleSubjectCreate = async (subject: Omit<Material, 'id'>) => {
+  const handleSubjectCreate = async (subject: Omit<Subject, 'id'>) => {
     try {
       await createSubject(subject);
     } catch (error) {
