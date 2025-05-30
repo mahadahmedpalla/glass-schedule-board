@@ -4,7 +4,9 @@ import Dashboard from '@/components/Dashboard';
 import SettingsPanel from '@/components/SettingsPanel';
 import MaterialsView from '@/components/MaterialsView';
 import PasscodeModal from '@/components/PasscodeModal';
-import { Subject, Material } from '@/types';
+import { Material } from '@/types';
+import { useSubjects } from '@/hooks/useSubjects';
+import { useMaterials } from '@/hooks/useMaterials';
 
 type ViewMode = 'dashboard' | 'settings' | 'materials';
 
@@ -14,30 +16,9 @@ const Index = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedDateMaterials, setSelectedDateMaterials] = useState<Material[]>([]);
 
-  // Mock data - in production, this would come from Supabase
-  const [subjects, setSubjects] = useState<Subject[]>([
-    { id: '1', name: 'Mathematics', color: '#3B82F6' },
-    { id: '2', name: 'Science', color: '#10B981' },
-  ]);
-
-  const [materials, setMaterials] = useState<Material[]>([
-    {
-      id: '1',
-      title: 'Algebra Assignment',
-      description: 'Complete exercises 1-20 from chapter 5',
-      subjectId: '1',
-      date: new Date().toISOString(),
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: '2',
-      title: 'Physics Lab Report',
-      description: 'Submit the pendulum experiment report',
-      subjectId: '2',
-      date: new Date(Date.now() + 86400000).toISOString(), // Tomorrow
-      createdAt: new Date().toISOString()
-    }
-  ]);
+  // Use custom hooks for data management
+  const { subjects, loading: subjectsLoading, createSubject, deleteSubject } = useSubjects();
+  const { materials, loading: materialsLoading, createMaterial } = useMaterials();
 
   const handleSettingsClick = () => {
     setShowPasscodeModal(true);
@@ -48,27 +29,28 @@ const Index = () => {
     setViewMode('settings');
   };
 
-  const handleSubjectCreate = (subject: Omit<Subject, 'id'>) => {
-    const newSubject: Subject = {
-      ...subject,
-      id: Date.now().toString()
-    };
-    setSubjects([...subjects, newSubject]);
+  const handleSubjectCreate = async (subject: Omit<Material, 'id'>) => {
+    try {
+      await createSubject(subject);
+    } catch (error) {
+      console.error('Failed to create subject:', error);
+    }
   };
 
-  const handleSubjectDelete = (id: string) => {
-    setSubjects(subjects.filter(s => s.id !== id));
-    // Also remove materials associated with this subject
-    setMaterials(materials.filter(m => m.subjectId !== id));
+  const handleSubjectDelete = async (id: string) => {
+    try {
+      await deleteSubject(id);
+    } catch (error) {
+      console.error('Failed to delete subject:', error);
+    }
   };
 
-  const handleMaterialCreate = (material: Omit<Material, 'id' | 'createdAt'>) => {
-    const newMaterial: Material = {
-      ...material,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString()
-    };
-    setMaterials([...materials, newMaterial]);
+  const handleMaterialCreate = async (material: Omit<Material, 'id' | 'createdAt'>) => {
+    try {
+      await createMaterial(material);
+    } catch (error) {
+      console.error('Failed to create material:', error);
+    }
   };
 
   const handleDateClick = (date: Date, dateMaterials: Material[]) => {
@@ -82,6 +64,18 @@ const Index = () => {
     setSelectedDate(null);
     setSelectedDateMaterials([]);
   };
+
+  // Show loading state while data is being fetched
+  if (subjectsLoading || materialsLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl font-semibold text-gray-700">Loading...</div>
+          <div className="text-sm text-gray-500 mt-2">Fetching your schedule data</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
