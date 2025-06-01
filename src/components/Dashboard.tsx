@@ -22,7 +22,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   onSettingsClick,
   onDateClick
 }) => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
 
   // Filter materials based on selected subject
@@ -45,12 +45,17 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      setSelectedDate(date);
       const dateMaterials = filteredMaterials.filter(m => 
         isSameDay(new Date(m.date), date)
       );
+      
+      // Only set as selected if the date has materials
       if (dateMaterials.length > 0) {
+        setSelectedDate(date);
         onDateClick(date, dateMaterials);
+      } else {
+        // Clear selection if date has no materials
+        setSelectedDate(undefined);
       }
     }
   };
