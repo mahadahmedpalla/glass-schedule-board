@@ -18,7 +18,7 @@ const Index = () => {
 
   // Use custom hooks for data management
   const { subjects, loading: subjectsLoading, createSubject, deleteSubject } = useSubjects();
-  const { materials, loading: materialsLoading, createMaterial } = useMaterials();
+  const { materials, loading: materialsLoading, createMaterial, refetch: refetchMaterials } = useMaterials();
 
   const handleSettingsClick = () => {
     setShowPasscodeModal(true);
@@ -40,6 +40,8 @@ const Index = () => {
   const handleSubjectDelete = async (id: string) => {
     try {
       await deleteSubject(id);
+      // Refetch materials to update the calendar since associated materials were cascaded deleted
+      await refetchMaterials();
     } catch (error) {
       console.error('Failed to delete subject:', error);
     }
@@ -54,9 +56,12 @@ const Index = () => {
   };
 
   const handleDateClick = (date: Date, dateMaterials: Material[]) => {
-    setSelectedDate(date);
-    setSelectedDateMaterials(dateMaterials);
-    setViewMode('materials');
+    // Only navigate to materials view if there are materials for this date
+    if (dateMaterials.length > 0) {
+      setSelectedDate(date);
+      setSelectedDateMaterials(dateMaterials);
+      setViewMode('materials');
+    }
   };
 
   const handleBackToDashboard = () => {

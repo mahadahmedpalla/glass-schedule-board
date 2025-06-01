@@ -42,6 +42,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_materials_subject_id"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "materials_subject_id_fkey"
             columns: ["subject_id"]
             isOneToOne: false
