@@ -1,0 +1,358 @@
+
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Send, Bot, User, Key, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Subject, Material } from '@/types';
+import { format } from 'date-fns';
+
+interface GeminiMaterialCreatorProps {
+  subjects: Subject[];
+  onMaterialCreate: (material: Omit<Material, 'id' | 'createdAt'>) => void;
+}
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+}
+
+interface GeneratedMaterial {
+  title: string;
+  description?: string;
+  subjectId?: string;
+  date: string;
+}
+
+const GeminiMaterialCreator: React.FC<GeminiMaterialCreatorProps> = ({
+  subjects,
+  onMaterialCreate
+}) => {
+  const [apiKey, setApiKey] = useState('');
+  const [isConnected, setIsConnected] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentInput, setCurrentInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [generatedMaterials, setGeneratedMaterials] = useState<GeneratedMaterial[]>([]);
+
+  const handleApiKeySubmit = () => {
+    if (apiKey.trim()) {
+      setIsConnected(true);
+      setChatMessages([{
+        id: '1',
+        role: 'assistant',
+        content: 'Hello! I\'m ready to help you create materials from your text. Please share any context about your study materials, assignments, or schedule, and I\'ll intelligently extract and organize them into material sets.',
+        timestamp: new Date()
+      }]);
+    }
+  };
+
+  const callGeminiAPI = async (prompt: string): Promise<GeneratedMaterial[]> => {
+    const systemPrompt = `You are an intelligent study material organizer. Based on the user's text input, extract and create study materials with the following guidelines:
+
+1. Identify subjects, topics, assignments, deadlines, and study materials
+2. Create appropriate titles and descriptions
+3. Determine dates from context (if no specific date, use reasonable defaults)
+4. Return JSON array with materials in this format:
+[
+  {
+    "title": "Material title",
+    "description": "Detailed description",
+    "subjectId": "subject_name_or_null",
+    "date": "YYYY-MM-DD"
+  }
+]
+
+Available subjects: ${subjects.map(s => `${s.name} (${s.id})`).join(', ')}
+
+If a subject mentioned doesn't match available subjects, set subjectId to null.
+Be intelligent about extracting multiple materials from context.
+Focus on actionable study items, assignments, readings, etc.`;
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              {
+                text: `${systemPrompt}\n\nUser input: ${prompt}`
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get response from Gemini API');
+    }
+
+    const data = await response.json();
+    const text = data.candidates[0].content.parts[0].text;
+    
+    // Extract JSON from response
+    const jsonMatch = text.match(/\[([\s\S]*?)\]/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    
+    throw new Error('Could not parse materials from response');
+  };
+
+  const handleSendMessage = async () => {
+    if (!currentInput.trim() || isLoading) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: currentInput,
+      timestamp: new Date()
+    };
+
+    setChatMessages(prev => [...prev, userMessage]);
+    setCurrentInput('');
+    setIsLoading(true);
+
+    try {
+      const materials = await callGeminiAPI(currentInput);
+      
+      // Match subject names to IDs
+      const processedMaterials = materials.map(material => ({
+        ...material,
+        subjectId: material.subjectId ? 
+          subjects.find(s => 
+            s.name.toLowerCase().includes(material.subjectId!.toLowerCase()) ||
+            s.id === material.subjectId
+          )?.id || undefined : undefined
+      }));
+
+      setGeneratedMaterials(processedMaterials);
+
+      const assistantMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `I've analyzed your input and generated ${processedMaterials.length} material(s). Please review them below and create the ones you'd like to add to your schedule.`,
+        timestamp: new Date()
+      };
+
+      setChatMessages(prev => [...prev, assistantMessage]);
+    } catch (error) {
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${error instanceof Error ? error.message : 'Unknown error'}. Please check your API key and try again.`,
+        timestamp: new Date()
+      };
+
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCreateMaterial = (material: GeneratedMaterial) => {
+    onMaterialCreate({
+      title: material.title,
+      description: material.description,
+      subjectId: material.subjectId,
+      date: new Date(material.date).toISOString()
+    });
+    
+    // Remove from generated materials
+    setGeneratedMaterials(prev => prev.filter(m => m !== material));
+  };
+
+  const getSubjectName = (subjectId?: string) => {
+    if (!subjectId) return 'No Subject';
+    return subjects.find(s => s.id === subjectId)?.name || 'Unknown Subject';
+  };
+
+  const getSubjectColor = (subjectId?: string) => {
+    if (!subjectId) return '#9CA3AF';
+    return subjects.find(s => s.id === subjectId)?.color || '#9CA3AF';
+  };
+
+  if (!isConnected) {
+    return (
+      <div className="space-y-6">
+        <Card className="bg-white/30 border-white/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              Connect to Gemini 2.0 Flash
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="apiKey">Gemini API Key</Label>
+              <Input
+                id="apiKey"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Enter your Gemini API key"
+                className="bg-white/50"
+              />
+              <p className="text-sm text-gray-600 mt-2">
+                Get your API key from the Google AI Studio
+              </p>
+            </div>
+            <Button 
+              onClick={handleApiKeySubmit}
+              disabled={!apiKey.trim()}
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Connect
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Connection Status */}
+      <Card className="bg-white/30 border-white/40">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 text-green-600">
+            <CheckCircle className="w-5 h-5" />
+            <span className="font-medium">Connected to Gemini 2.0 Flash</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Chat Interface */}
+      <Card className="bg-white/30 border-white/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bot className="w-5 h-5" />
+            Material Generation Chat
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <ScrollArea className="h-64 w-full border rounded-md p-4 bg-white/20">
+            <div className="space-y-4">
+              {chatMessages.map((message) => (
+                <div key={message.id} className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`flex gap-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/30 flex items-center justify-center">
+                      {message.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                    </div>
+                    <div className={`rounded-lg p-3 ${message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-white/50'}`}>
+                      <p className="text-sm">{message.content}</p>
+                      <p className="text-xs opacity-70 mt-1">
+                        {format(message.timestamp, 'HH:mm')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex gap-3 justify-start">
+                  <div className="flex gap-2">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/30 flex items-center justify-center">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="rounded-lg p-3 bg-white/50">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">Analyzing your input...</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+
+          <div className="flex gap-2">
+            <Textarea
+              value={currentInput}
+              onChange={(e) => setCurrentInput(e.target.value)}
+              placeholder="Describe your study materials, assignments, or schedule..."
+              className="bg-white/50 resize-none"
+              rows={3}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+            />
+            <Button
+              onClick={handleSendMessage}
+              disabled={!currentInput.trim() || isLoading}
+              className="bg-blue-500 hover:bg-blue-600 text-white self-end"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Generated Materials */}
+      {generatedMaterials.length > 0 && (
+        <Card className="bg-white/30 border-white/40">
+          <CardHeader>
+            <CardTitle>Generated Materials</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {generatedMaterials.map((material, index) => (
+                <Card key={index} className="bg-white/40 border-white/50">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <h4 className="font-semibold text-lg">{material.title}</h4>
+                        {material.description && (
+                          <p className="text-sm text-gray-600">{material.description}</p>
+                        )}
+                        <div className="flex items-center gap-3">
+                          <Badge 
+                            className="text-white"
+                            style={{ backgroundColor: getSubjectColor(material.subjectId) }}
+                          >
+                            {getSubjectName(material.subjectId)}
+                          </Badge>
+                          <span className="text-sm text-gray-500">
+                            {format(new Date(material.date), 'PPP')}
+                          </span>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => handleCreateMaterial(material)}
+                        className="bg-green-500 hover:bg-green-600 text-white"
+                      >
+                        Create Material
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+export default GeminiMaterialCreator;

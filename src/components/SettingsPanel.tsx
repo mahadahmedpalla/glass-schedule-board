@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Subject, Material } from '@/types';
 import SubjectManager from './SubjectManager';
 import MaterialCreator from './MaterialCreator';
+import GeminiMaterialCreator from './GeminiMaterialCreator';
 
 interface SettingsPanelProps {
   subjects: Subject[];
@@ -45,9 +46,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="subjects" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-white/20">
+              <TabsList className="grid w-full grid-cols-3 bg-white/20">
                 <TabsTrigger value="subjects">Subjects</TabsTrigger>
                 <TabsTrigger value="materials">Create Material</TabsTrigger>
+                <TabsTrigger value="gemini">Feed Information with Gemini</TabsTrigger>
               </TabsList>
               
               <TabsContent value="subjects" className="mt-6">
@@ -60,6 +62,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               
               <TabsContent value="materials" className="mt-6">
                 <MaterialCreator
+                  subjects={subjects}
+                  onMaterialCreate={onMaterialCreate}
+                />
+              </TabsContent>
+
+              <TabsContent value="gemini" className="mt-6">
+                <GeminiMaterialCreator
                   subjects={subjects}
                   onMaterialCreate={onMaterialCreate}
                 />
