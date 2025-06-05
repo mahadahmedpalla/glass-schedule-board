@@ -54,11 +54,30 @@ const GeminiMaterialCreator: React.FC<GeminiMaterialCreatorProps> = ({
   };
 
   const callGeminiAPI = async (prompt: string): Promise<GeneratedMaterial[]> => {
-    const systemPrompt = `You are an intelligent study material organizer. Based on the user's text input, extract and create study materials with the following guidelines:
+    const currentDate = new Date();
+    const currentDateString = format(currentDate, 'PPP'); // e.g., "December 5, 2025"
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = format(currentDate, 'MMMM'); // e.g., "December"
+    
+    const systemPrompt = `You are an intelligent study material organizer. 
+
+CURRENT DATE CONTEXT:
+- Today's date: ${currentDateString}
+- Current year: ${currentYear}
+- Current month: ${currentMonth}
+
+Based on the user's text input, extract and create study materials with the following guidelines:
 
 1. Identify subjects, topics, assignments, deadlines, and study materials
 2. Create appropriate titles and descriptions
-3. Determine dates from context (if no specific date, use reasonable defaults)
+3. Determine dates from context using these rules:
+   - If a specific date is mentioned, use that date
+   - If only a day is mentioned (e.g., "Monday", "next Tuesday"), calculate from today's date
+   - If a relative date is mentioned (e.g., "next week", "in 3 days", "tomorrow"), calculate from today's date
+   - If a month is mentioned without year, assume current year (${currentYear})
+   - If no date is specified but it seems like an assignment/exam, suggest a reasonable future date within the next few weeks
+   - NEVER use dates from 2024 or past years unless explicitly mentioned
+   - Always use ${currentYear} as the default year
 4. Return JSON array with materials in this format:
 [
   {
@@ -73,7 +92,9 @@ Available subjects: ${subjects.map(s => `${s.name} (${s.id})`).join(', ')}
 
 If a subject mentioned doesn't match available subjects, set subjectId to null.
 Be intelligent about extracting multiple materials from context.
-Focus on actionable study items, assignments, readings, etc.`;
+Focus on actionable study items, assignments, readings, etc.
+
+IMPORTANT: All dates MUST be in ${currentYear} or later, never use 2024 or earlier years unless explicitly mentioned by the user.`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -109,7 +130,28 @@ Focus on actionable study items, assignments, readings, etc.`;
     // Extract JSON from response
     const jsonMatch = text.match(/\[([\s\S]*?)\]/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const materials = JSON.parse(jsonMatch[0]);
+      
+      // Validate and fix dates to ensure they're not in the past
+      const currentYear = new Date().getFullYear();
+      const validatedMaterials = materials.map((material: GeneratedMaterial) => {
+        const materialDate = new Date(material.date);
+        const materialYear = materialDate.getFullYear();
+        
+        // If the year is before current year, update it to current year
+        if (materialYear < currentYear) {
+          const updatedDate = new Date(materialDate);
+          updatedDate.setFullYear(currentYear);
+          return {
+            ...material,
+            date: format(updatedDate, 'yyyy-MM-dd')
+          };
+        }
+        
+        return material;
+      });
+      
+      return validatedMaterials;
     }
     
     throw new Error('Could not parse materials from response');
@@ -235,6 +277,9 @@ Focus on actionable study items, assignments, readings, etc.`;
           <div className="flex items-center gap-2 text-green-600">
             <CheckCircle className="w-5 h-5" />
             <span className="font-medium">Connected to Gemini 2.0 Flash</span>
+            <span className="text-sm text-gray-600 ml-4">
+              Current date: {format(new Date(), 'PPP')}
+            </span>
           </div>
         </CardContent>
       </Card>
