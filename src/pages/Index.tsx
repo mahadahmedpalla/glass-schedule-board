@@ -50,6 +50,8 @@ const Index = () => {
   const handleMaterialCreate = async (material: Omit<Material, 'id' | 'createdAt'>) => {
     try {
       await createMaterial(material);
+      // Refetch materials to ensure the calendar is updated with new materials
+      await refetchMaterials();
     } catch (error) {
       console.error('Failed to create material:', error);
     }
@@ -64,10 +66,12 @@ const Index = () => {
     }
   };
 
-  const handleBackToDashboard = () => {
+  const handleBackToDashboard = async () => {
     setViewMode('dashboard');
     setSelectedDate(null);
     setSelectedDateMaterials([]);
+    // Refetch materials when returning to dashboard to ensure calendar is up to date
+    await refetchMaterials();
   };
 
   // Show loading state while data is being fetched
