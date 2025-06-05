@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Send, Bot, User, Key, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Subject, Material } from '@/types';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 
 interface GeminiMaterialCreatorProps {
   subjects: Subject[];
@@ -78,6 +78,7 @@ Based on the user's text input, extract and create study materials with the foll
    - If no date is specified but it seems like an assignment/exam, suggest a reasonable future date within the next few weeks
    - NEVER use dates from 2024 or past years unless explicitly mentioned
    - Always use ${currentYear} as the default year
+   - IMPORTANT: Always return dates in YYYY-MM-DD format to avoid timezone issues
 4. Return JSON array with materials in this format:
 [
   {
@@ -94,7 +95,10 @@ If a subject mentioned doesn't match available subjects, set subjectId to null.
 Be intelligent about extracting multiple materials from context.
 Focus on actionable study items, assignments, readings, etc.
 
-IMPORTANT: All dates MUST be in ${currentYear} or later, never use 2024 or earlier years unless explicitly mentioned by the user.`;
+IMPORTANT: 
+- All dates MUST be in ${currentYear} or later, never use 2024 or earlier years unless explicitly mentioned by the user.
+- Always return dates in YYYY-MM-DD format exactly as specified to prevent timezone conversion issues.
+- When user mentions "June 3rd" or "3rd June", return "2025-06-03" exactly.`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -132,19 +136,34 @@ IMPORTANT: All dates MUST be in ${currentYear} or later, never use 2024 or earli
     if (jsonMatch) {
       const materials = JSON.parse(jsonMatch[0]);
       
-      // Validate and fix dates to ensure they're not in the past
+      // Validate and fix dates to ensure they're not in the past and handle timezone issues
       const currentYear = new Date().getFullYear();
       const validatedMaterials = materials.map((material: GeneratedMaterial) => {
-        const materialDate = new Date(material.date);
-        const materialYear = materialDate.getFullYear();
+        // Parse the date string directly without timezone conversion
+        const dateStr = material.date;
         
-        // If the year is before current year, update it to current year
-        if (materialYear < currentYear) {
-          const updatedDate = new Date(materialDate);
-          updatedDate.setFullYear(currentYear);
+        // Ensure the date is in YYYY-MM-DD format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(dateStr)) {
+          // If not in correct format, try to parse and reformat
+          const parsedDate = new Date(dateStr);
+          const year = parsedDate.getFullYear();
+          const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+          const day = String(parsedDate.getDate()).padStart(2, '0');
+          const formattedDate = `${year >= currentYear ? year : currentYear}-${month}-${day}`;
+          
           return {
             ...material,
-            date: format(updatedDate, 'yyyy-MM-dd')
+            date: formattedDate
+          };
+        }
+        
+        // If already in correct format, just validate the year
+        const year = parseInt(dateStr.split('-')[0]);
+        if (year < currentYear) {
+          return {
+            ...material,
+            date: dateStr.replace(/^\d{4}/, currentYear.toString())
           };
         }
         
@@ -209,11 +228,20 @@ IMPORTANT: All dates MUST be in ${currentYear} or later, never use 2024 or earli
   };
 
   const handleCreateMaterial = (material: GeneratedMaterial) => {
+    // Create a date object from the YYYY-MM-DD string without timezone conversion
+    const dateParts = material.date.split('-');
+    const year = parseInt(dateParts[0]);
+    const month = parseInt(dateParts[1]) - 1; // Month is 0-indexed in Date constructor
+    const day = parseInt(dateParts[2]);
+    
+    // Create date in local timezone to avoid shifts
+    const materialDate = new Date(year, month, day);
+    
     onMaterialCreate({
       title: material.title,
       description: material.description,
       subjectId: material.subjectId,
-      date: new Date(material.date).toISOString()
+      date: materialDate.toISOString()
     });
     
     // Remove from generated materials
@@ -378,7 +406,7 @@ IMPORTANT: All dates MUST be in ${currentYear} or later, never use 2024 or earli
                             {getSubjectName(material.subjectId)}
                           </Badge>
                           <span className="text-sm text-gray-500">
-                            {format(new Date(material.date), 'PPP')}
+                            {format(parseISO(material.date + 'T00:00:00'), 'PPP')}
                           </span>
                         </div>
                       </div>
